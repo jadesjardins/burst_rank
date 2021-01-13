@@ -38,7 +38,7 @@ accts=job_frame.account.unique()
 print(len(accts))
 
 #accts=accts[0:12]
-accts=accts[45:50]
+#accts=accts[45:50]
 
 d_from='2020-11-12'
 
