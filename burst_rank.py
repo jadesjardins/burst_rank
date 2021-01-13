@@ -38,14 +38,9 @@ accts=job_frame.account.unique()
 print(len(accts))
 
 #accts=accts[0:12]
-#accts=accts[45:50]
+accts=accts[45:50]
 
 d_from='2020-11-12'
-d_to=''
-if d_to == '':
-    now = datetime.now()
-    d_to = now.strftime('%Y-%m-%dT%H:%M:%S')
-ref_time = pd.to_datetime(d_to)
 
 target=50
 
@@ -76,7 +71,7 @@ for acct in accts:
     print(len(job_frame))
     #print(job_frame)
 
-    # This try/except block is problematic because it will ignoge any account
+    # TODO This try/except block is problematic because it will ignoge any account
     # that cause a job_use failure... this includes accounts that have pending jobs
     # but no completed jobs. Instead job)use should eb made to be more robust to 
     # account job record states
@@ -88,6 +83,7 @@ for acct in accts:
         rel_use_d7.append(None)
         q_load.append(None)
         rel_queue_h.append(None)
+        hq_load.append(None)
         print('No jobs left in the queue for this account')
         continue
 
@@ -121,34 +117,47 @@ for acct in accts:
 #                submit_run=submit_run,
                 query_bounds=False)
 
+    # TODO make this robust
+    # make the timestamp for 7 days in the past from the ref_time (now-ish)
     d7=(ref_time - pd.Timedelta(7, unit='d'))
     d7t=pd.Timestamp(d7).strftime('%Y-%m-%d %H:00:00')
 
+    # Calculate the cumulative target and usage over the query period 
     target_cumu = np.cumsum(target).divide(len(target))
     run_cumu = np.cumsum(running).divide(len(running))
 
-
+    # Calculate the area under the cumulative target and use over the past 7 days.
     t=target_cumu[d7t:ref_time].mean()
     r=run_cumu[d7t:ref_time].mean()
+    # Calculate the area under the queue load over that past 7 days.
     q=queued[d7t:ref_time].mean()
     
+    # Append the realtive use for this account as last 7 day cumulative use 
+    # divided by the cumulative target over the same period.
     rel_use_d7.append(r/t)
+    # Append the pending queue load for this account as average of the last 7 days. 
     q_load.append(q)
 
     print(rel_use_d7)
 
+    # Set a time stamp 7 days past the ref_time.
     d7p=(ref_time + pd.Timedelta(7, unit='d'))
     d7pt=pd.Timestamp(d7p).strftime('%Y-%m-%d %H:00:00')
+
+    # get the horizon queue measure as the mean of pending queued resources beyond the ref_time.
     hq=q_queued[ref_time:]
     hql=len(hq)
-    hqs=hq.sum()
-    hts=hql*50
+    hqm=hq.mean()
+    hq_load.append(hqm)
+    # Calculate the equivalent of the 50 CE target over the period of the horizon queue measure.
+    htm=50
 
     print('hq SUM')
     print(hql)
-    print(hqs)
-    print(hts)
-    rel_queue_h.append(hqs/hts)
+    print(hqm)
+    print(htm)
+    # Calculate the relative queue horizon as the sum horizon queue sum divided by the horizon target sum. 
+    rel_queue_h.append(hqm/htm)
     print('rel_queue_h')
     print(rel_queue_h)
 
@@ -159,7 +168,9 @@ q_load_series = pd.Series(q_load)
 hq_load_series = pd.Series(hq_load) 
 rel_queue_series = pd.Series(rel_queue_h) 
   
-frame = { 'account': accts_series, 'rel_use_d7': rel_use_series, 'q_load': q_load_series, 'rel_queue_h': rel_queue_series, 'hq_load': hq_load_series } 
+frame = { 'account': accts_series, 'rel_use_d7': rel_use_series, 
+            'q_load': q_load_series, 'rel_queue_h': rel_queue_series, 
+            'hq_load': hq_load_series } 
   
 result = pd.DataFrame(frame) 
 
